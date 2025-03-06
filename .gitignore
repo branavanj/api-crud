@@ -1,0 +1,27 @@
+# Modules Node.js
+node_modules/
+
+# Logs
+logs/
+*.log
+
+# Fichier de variables d'environnement
+.env
+
+# Répertoires de build
+dist/
+build/
+
+# Fichiers de debug et caches npm/yarn
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Répertoires de couverture de tests
+coverage/
+.nyc_output/
+
+# Fichiers et dossiers spécifiques aux éditeurs/OS
+.DS_Store
+.idea/
+.vscode/
