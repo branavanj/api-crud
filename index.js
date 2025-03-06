@@ -167,7 +167,7 @@ function authenticateToken(req, res, next) {
  * @swagger
  * /health:
  *   get:
- *     summary: Vérifie l'état de santé de l'application
+ *     summary: Vérifie l'état de santé des services 
  *     description: Retourne le statut de la connexion à la base de données et au service SMTP, ainsi qu'un timestamp.
  *     responses:
  *       200:
