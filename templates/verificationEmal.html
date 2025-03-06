@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Validation de votre email</title>
+  <style>
+    /* Style général */
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #f4f4f4;
+      font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+      color: #333;
+    }
+    .email-container {
+      max-width: 600px;
+      margin: 40px auto;
+      border: 1px solid #ddd;
+      background-color: #fff;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .header {
+      background-color: #007BFF;
+      padding: 20px;
+      text-align: center;
+      color: #fff;
+    }
+    .header h1 {
+      margin: 0;
+      font-size: 24px;
+    }
+    .content {
+      padding: 30px;
+      line-height: 1.6;
+      font-size: 16px;
+    }
+    .content h2 {
+      margin-top: 0;
+    }
+    .btn {
+      display: inline-block;
+      background-color: #28a745;
+      color: #fff;
+      text-decoration: none;
+      padding: 12px 20px;
+      border-radius: 4px;
+      margin: 20px 0;
+    }
+    .footer {
+      background-color: #f1f1f1;
+      padding: 15px;
+      text-align: center;
+      font-size: 14px;
+      color: #777;
+    }
+    .footer a {
+      color: #007BFF;
+      text-decoration: none;
+    }
+    @media only screen and (max-width: 600px) {
+      .email-container {
+        width: 100% !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="email-container">
+    <div class="header">
+      <h1>Votre Compagnie</h1>
+    </div>
+    <div class="content">
+      <h2>Validation de votre email</h2>
+      <p>Bonjour,</p>
+      <p>
+        Merci de vous être inscrit sur notre plateforme. Pour activer votre compte, veuillez cliquer sur le bouton ci-dessous afin de valider votre adresse email.
+      </p>
+      <p style="text-align: center;">
+        <a href="{{url}}" class="btn">Valider mon email</a>
+      </p>
+      <p>
+        Si le bouton ne fonctionne pas, copiez et collez le lien suivant dans votre navigateur :
+      </p>
+      <p>
+        <a href="{{url}}">{{url}}</a>
+      </p>
+    </div>
+    <div class="footer">
+      <p>
+        &reg; Votre Compagnie, 2025. Pour toute question, <a href="mailto:contact@votrecompagnie.com">contactez-nous</a>.
+      </p>
+    </div>
+  </div>
+</body>
+</html>
