@@ -7,15 +7,41 @@ const nodemailer = require('nodemailer');
 const swaggerUi = require('swagger-ui-express');
 const swaggerJsdoc = require('swagger-jsdoc');
 const bcrypt = require('bcrypt');
+const fs = require('fs');
+const path = require('path');
+const winston = require('winston');
+const morgan = require('morgan');
 
 const app = express();
 const port = process.env.PORT || 3000;
 const SECRET_KEY = process.env.SECRET_KEY;
 const saltRounds = 10;
+const cors = require('cors');
 
-// Servir le front-end statique (par exemple, dans le dossier "public")
+app.use(cors({
+  origin: '*', // Autorise toutes les origines (tu peux restreindre à ton frontend)
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Authorization', 'Content-Type']
+}));
+
+
+// --- Configuration du système de log avec Winston et Morgan ---
+const logger = winston.createLogger({
+  level: 'info',
+  format: winston.format.combine(
+    winston.format.timestamp(),
+    winston.format.printf(info => `${info.timestamp} ${info.level.toUpperCase()}: ${info.message}`)
+  ),
+  transports: [
+    new winston.transports.Console(),
+    new winston.transports.File({ filename: 'logs/app.log' })
+  ]
+});
+
+app.use(morgan('combined', { stream: { write: message => logger.info(message.trim()) } }));
+
+// --- Middleware & configuration Express ---
 app.use(express.static('public'));
-
 app.use(bodyParser.json());
 
 const db = mysql.createPool({
@@ -25,7 +51,7 @@ const db = mysql.createPool({
   database: process.env.DB_NAME
 });
 
-// Configuration de Nodemailer (ici avec Gmail)
+// --- Configuration de Nodemailer ---
 const transporter = nodemailer.createTransport({
   service: 'Gmail',
   auth: {
@@ -34,97 +60,18 @@ const transporter = nodemailer.createTransport({
   }
 });
 
-// Template HTML complet pour l'email de validation
-const emailTemplate = `
-<!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="UTF-8" />
-    <title>Validation de votre email</title>
-  </head>
-  <body style="margin: 0; padding: 0; background-color: #f4f4f4;">
-    <table border="0" cellpadding="0" cellspacing="0" width="100%">
-      <tr>
-        <td style="padding: 20px 0 30px 0;">
-          <table align="center" border="0" cellpadding="0" cellspacing="0" width="600"
-            style="border-collapse: collapse; border: 1px solid #cccccc; background-color: #ffffff;">
-            <tr>
-              <td align="center" bgcolor="#70bbd9"
-                style="padding: 40px 0 30px 0; font-family: Arial, sans-serif;">
-                <h1 style="color: #ffffff; margin: 0;">Votre Compagnie</h1>
-              </td>
-            </tr>
-            <tr>
-              <td style="padding: 40px 30px 40px 30px; font-family: Arial, sans-serif;">
-                <table border="0" cellpadding="0" cellspacing="0" width="100%">
-                  <tr>
-                    <td style="color: #153643; font-size: 24px;">
-                      <b>Validation de votre email</b>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td style="padding: 20px 0 30px 0; color: #153643; font-size: 16px; line-height: 20px;">
-                      Bonjour,<br /><br />
-                      Merci de vous être inscrit sur notre plateforme. Pour activer votre compte, veuillez cliquer sur le bouton ci-dessous afin de valider votre adresse email.
-                    </td>
-                  </tr>
-                  <tr>
-                    <td align="center">
-                      <a href="{{url}}"
-                        style="background-color: #28a745; color: #ffffff; padding: 15px 25px; text-decoration: none; font-size: 16px; border-radius: 5px;">
-                        Valider mon email
-                      </a>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td style="padding: 20px 0 30px 0; color: #153643; font-size: 14px; line-height: 18px;">
-                      Si vous n'arrivez pas à cliquer sur le bouton, copiez et collez le lien suivant dans votre navigateur :<br />
-                      <a href="{{url}}" style="color: #28a745;">{{url}}</a>
-                    </td>
-                  </tr>
-                </table>
-              </td>
-            </tr>
-            <tr>
-              <td bgcolor="#ee4c50" style="padding: 30px 30px;">
-                <table border="0" cellpadding="0" cellspacing="0" width="100%">
-                  <tr>
-                    <td style="color: #ffffff; font-family: Arial, sans-serif; font-size: 14px;">
-                      &reg; Votre Compagnie, 2025<br />
-                      Pour toute question, contactez-nous.
-                    </td>
-                    <td align="right">
-                      <table border="0" cellpadding="0" cellspacing="0">
-                        <tr>
-                          <td>
-                            <a href="http://www.twitter.com/">
-                              <img src="https://via.placeholder.com/38" alt="Twitter" width="38" height="38"
-                                style="display: block;" border="0" />
-                            </a>
-                          </td>
-                          <td style="font-size: 0; line-height: 0;" width="20">&nbsp;</td>
-                          <td>
-                            <a href="http://www.facebook.com/">
-                              <img src="https://via.placeholder.com/38" alt="Facebook" width="38" height="38"
-                                style="display: block;" border="0" />
-                            </a>
-                          </td>
-                        </tr>
-                      </table>
-                    </td>
-                  </tr>
-                </table>
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-    </table>
-  </body>
-</html>
-`;
+// --- Chargement du template d'email depuis un fichier externe ---
+const templatePath = path.join(__dirname, 'templates', 'verificationEmail.html');
+let emailTemplate;
+try {
+  emailTemplate = fs.readFileSync(templatePath, 'utf8');
+  logger.info('Template email chargé avec succès.');
+} catch (error) {
+  logger.error('Erreur lors du chargement du template email: ' + error.message);
+  process.exit(1);
+}
 
-// Swagger configuration
+// --- Configuration Swagger ---
 const swaggerOptions = {
   definition: {
     openapi: '3.0.0',
@@ -133,7 +80,7 @@ const swaggerOptions = {
       version: '1.0.0',
       description: 'Documentation de l\'API'
     },
-    servers: [{ url: `http://localhost:${port}` }],
+    servers: [{ url: `https://api.esgi.local` }],
     components: {
       securitySchemes: {
         bearerAuth: {
@@ -144,24 +91,28 @@ const swaggerOptions = {
       }
     }
   },
-  apis: ['./index.js'] // Les annotations Swagger se trouvent dans ce fichier
+  apis: ['./index.js']
 };
 const swaggerSpec = swaggerJsdoc(swaggerOptions);
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
-// Middleware pour vérifier le token JWT (endpoints protégés)
+// --- Middleware de vérification du token JWT ---
 function authenticateToken(req, res, next) {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
-  if (!token) return res.status(401).json({ error: 'Token manquant' });
+  if (!token) {
+    logger.error('Token manquant dans la requête.');
+    return res.status(401).json({ error: 'Token manquant' });
+  }
   jwt.verify(token, SECRET_KEY, (err, user) => {
-    if (err) return res.status(403).json({ error: 'Token invalide ou expiré' });
+    if (err) {
+      logger.error('Token invalide ou expiré: ' + err.message);
+      return res.status(403).json({ error: 'Token invalide ou expiré' });
+    }
     req.user = user;
     next();
   });
 }
-
-
 
 /**
  * @swagger
@@ -172,37 +123,19 @@ function authenticateToken(req, res, next) {
  *     responses:
  *       200:
  *         description: Etat de santé retourné avec succès.
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 database:
- *                   type: string
- *                   example: OK
- *                 smtp:
- *                   type: string
- *                   example: OK
- *                 timestamp:
- *                   type: string
- *                   example: "2025-03-05T12:34:56.789Z"
  */
 app.get('/health', (req, res) => {
-  // Vérification de la base de données via une requête simple
   db.query('SELECT 1 AS result', (dbErr, dbResults) => {
     const dbStatus = !dbErr;
     if (dbErr) {
-      console.error('[Health Check] - Erreur BDD:', dbErr);
+      logger.error('[Health Check] - Erreur BDD: ' + dbErr.message);
     }
-    // Vérification du service SMTP via transporter.verify de Nodemailer
     transporter.verify((smtpErr, success) => {
       const smtpStatus = !smtpErr;
       if (smtpErr) {
-        console.error('[Health Check] - Erreur SMTP:', smtpErr);
+        logger.error('[Health Check] - Erreur SMTP: ' + smtpErr.message);
       }
-      // Log des résultats avec un horodatage
-      console.log(`[Health Check] - BDD: ${dbStatus ? 'OK' : 'ERREUR'}, SMTP: ${smtpStatus ? 'OK' : 'ERREUR'} - ${new Date().toISOString()}`);
-      // Réponse JSON indiquant l'état de chaque service
+      logger.info(`[Health Check] - BDD: ${dbStatus ? 'OK' : 'ERREUR'}, SMTP: ${smtpStatus ? 'OK' : 'ERREUR'} - ${new Date().toISOString()}`);
       res.json({
         database: dbStatus ? 'OK' : 'ERREUR',
         smtp: smtpStatus ? 'OK' : 'ERREUR',
@@ -211,10 +144,6 @@ app.get('/health', (req, res) => {
     });
   });
 });
-
-
-
-
 
 /**
  * @swagger
@@ -236,32 +165,28 @@ app.get('/health', (req, res) => {
  *     responses:
  *       200:
  *         description: Inscription réussie, email de validation envoyé.
- *       400:
- *         description: Email ou mot de passe manquant.
- *       500:
- *         description: Erreur serveur.
  */
 app.post('/register', (req, res) => {
   const { email, password } = req.body;
-  if (!email || !password)
+  if (!email || !password) {
+    logger.error('Email et password requis pour l’inscription.');
     return res.status(400).json({ error: 'Email et password requis' });
-
-  // Hashage du mot de passe
+  }
   bcrypt.hash(password, saltRounds, (err, hashedPassword) => {
     if (err) {
-      console.error(err);
+      logger.error('Erreur lors du hash du mot de passe: ' + err.message);
       return res.status(500).json({ error: 'Erreur lors du hash du mot de passe' });
     }
     const query = 'INSERT INTO users (username, password, role, verified) VALUES (?, ?, ?, ?)';
     db.query(query, [email, hashedPassword, 'user', false], (error, results) => {
       if (error) {
-        console.error(error);
+        logger.error('Erreur lors de la création de l’utilisateur: ' + error.message);
         return res.status(500).json({ error: 'Erreur lors de la création de l\'utilisateur' });
       }
       const userId = results.insertId;
-      // Génération d'un token pour la validation de l'email (valable 1 jour)
-      const emailToken = jwt.sign({ id: userId, email: email }, SECRET_KEY, { expiresIn: '1d' });
-      const verificationUrl = `http://localhost:${port}/verify-email?token=${emailToken}`;
+      // Génération d'un token pour la validation de l'email valable 10 minutes
+      const emailToken = jwt.sign({ id: userId, email: email }, SECRET_KEY, { expiresIn: '10m' });
+      const verificationUrl = `https://api.esgi.local/verify-email?token=${emailToken}`;
       const emailHtml = emailTemplate.replace(/{{url}}/g, verificationUrl);
       transporter.sendMail({
         from: process.env.EMAIL_USER,
@@ -270,9 +195,10 @@ app.post('/register', (req, res) => {
         html: emailHtml
       }, (err, info) => {
         if (err) {
-          console.error(err);
+          logger.error('Erreur lors de l’envoi de l’email de validation: ' + err.message);
           return res.status(500).json({ error: 'Erreur lors de l\'envoi de l\'email de validation' });
         }
+        logger.info(`Email de validation envoyé à ${email}`);
         res.json({ message: 'Inscription réussie ! Veuillez vérifier votre email pour activer votre compte.' });
       });
     });
@@ -295,23 +221,26 @@ app.post('/register', (req, res) => {
  *     responses:
  *       200:
  *         description: Email validé avec succès.
- *       400:
- *         description: Token manquant ou invalide.
- *       500:
- *         description: Erreur serveur.
  */
 app.get('/verify-email', (req, res) => {
   const { token } = req.query;
-  if (!token) return res.status(400).json({ error: 'Token manquant' });
+  if (!token) {
+    logger.error('Token de vérification manquant.');
+    return res.status(400).json({ error: 'Token manquant' });
+  }
   jwt.verify(token, SECRET_KEY, (err, decoded) => {
-    if (err) return res.status(400).json({ error: 'Token invalide ou expiré' });
+    if (err) {
+      logger.error('Token invalide ou expiré: ' + err.message);
+      return res.status(400).json({ error: 'Token invalide ou expiré' });
+    }
     const { id } = decoded;
     const query = 'UPDATE users SET verified = ? WHERE id = ?';
     db.query(query, [true, id], (error, results) => {
       if (error) {
-        console.error(error);
+        logger.error('Erreur lors de la vérification de l’email: ' + error.message);
         return res.status(500).json({ error: 'Erreur lors de la vérification de l\'email' });
       }
+      logger.info(`Email vérifié pour l’utilisateur id ${id}`);
       res.json({ message: 'Email vérifié avec succès. Vous pouvez maintenant vous connecter.' });
     });
   });
@@ -337,43 +266,44 @@ app.get('/verify-email', (req, res) => {
  *     responses:
  *       200:
  *         description: Authentification réussie, retourne un token JWT.
- *       400:
- *         description: Email ou mot de passe manquant.
- *       401:
- *         description: Identifiants incorrects.
- *       403:
- *         description: Email non vérifié.
- *       500:
- *         description: Erreur serveur.
  */
 app.post('/authenticate', (req, res) => {
   const { email, password } = req.body;
-  if (!email || !password)
+  if (!email || !password) {
+    logger.error('Email et password requis pour l’authentification.');
     return res.status(400).json({ error: 'Email et password requis' });
+  }
   const query = 'SELECT * FROM users WHERE username = ?';
   db.query(query, [email], (error, results) => {
     if (error) {
-      console.error(error);
+      logger.error('Erreur serveur lors de l’authentification: ' + error.message);
       return res.status(500).json({ error: 'Erreur serveur' });
     }
-    if (results.length === 0)
+    if (results.length === 0) {
+      logger.error(`Identifiants incorrects pour l’email: ${email}`);
       return res.status(401).json({ error: 'Identifiants incorrects' });
+    }
     const user = results[0];
-    // Comparaison du mot de passe avec bcrypt
     bcrypt.compare(password, user.password, (err, isMatch) => {
       if (err) {
-        console.error(err);
+        logger.error('Erreur lors de la comparaison des mots de passe: ' + err.message);
         return res.status(500).json({ error: 'Erreur lors de la vérification du mot de passe' });
       }
-      if (!isMatch)
+      if (!isMatch) {
+        logger.error(`Mot de passe incorrect pour l’email: ${email}`);
         return res.status(401).json({ error: 'Identifiants incorrects' });
-      if (!user.verified)
+      }
+      if (!user.verified) {
+        logger.error(`Email non vérifié pour l’email: ${email}`);
         return res.status(403).json({ error: 'Email non vérifié. Veuillez vérifier votre email.' });
+      }
       const authToken = jwt.sign({ id: user.id, email: user.username, role: user.role }, SECRET_KEY, { expiresIn: '1h' });
+      logger.info(`Utilisateur authentifié: ${email}`);
       res.json({ token: authToken });
     });
   });
 });
+
 
 /**
  * @swagger
@@ -417,6 +347,7 @@ app.post('/orders', authenticateToken, (req, res) => {
     res.json({ message: 'Commande créée avec succès', orderId: results.insertId });
   });
 });
+
 
 /**
  * @swagger
@@ -535,6 +466,8 @@ app.delete('/orders/:id', authenticateToken, (req, res) => {
   });
 });
 
+
+
 app.listen(port, () => {
-  console.log(`Serveur démarré sur le port ${port}`);
+  logger.info(`Serveur démarré sur le port ${port}`);
 });
